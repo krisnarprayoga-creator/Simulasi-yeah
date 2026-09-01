@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simulasi Merakit PC — Game HTML</title>
+  <style>
+    :root{
+      --bg:#0f1724;
+      --panel:#0b1220;
+      --accent:#16a34a;
+      --muted:#94a3b8;
+      --card:#0f1724;
+      --slot:#112131;
+      --bad:#ef4444;
+      --good:#10b981;
+      --glass: rgba(255,255,255,0.03);
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;padding:24px;background:linear-gradient(180deg,#071024 0%, #07162a 100%);color:#e6eef6;
+      font-size:15px;line-height:1.35;
+    }
+    header{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+    h1{font-size:18px;margin:0}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+    .wrap{display:grid;grid-template-columns:340px 1fr 300px;gap:18px;align-items:start}
+    .panel{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.03);
+      padding:14px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.6)
+    }
+
+    /* Inventory */
+    #inventory{display:flex;flex-direction:column;gap:12px}
+    .inventory-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .component{
+      background:var(--glass);padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);
+      display:flex;gap:10px;align-items:center;cursor:grab;user-select:none;
+    }
+    .component:active{cursor:grabbing}
+    .comp-emoji{font-size:22px;width:36px;text-align:center}
+    .comp-title{font-weight:600}
+    .comp-desc{font-size:13px;color:var(--muted)}
+
+    /* Case & motherboard area */
+    #case-area{
+      min-height:540px;display:flex;align-items:center;justify-content:center;
+      position:relative;
+    }
+    .pc-case{
+      width:600px;height:420px;background:linear-gradient(180deg,#071428,#0b1b2a);
+      border-radius:14px;padding:18px;border:1px solid rgba(255,255,255,0.04);
+      display:grid;grid-template-columns:1fr 220px;gap:14px;
+    }
+    .chamber{background:linear-gradient(180deg,#0b2030,#071a2a);border-radius:8px;padding:12px;border:1px dashed rgba(255,255,255,0.02);position:relative}
+    .mobo{
+      width:100%;height:100%;background:linear-gradient(180deg,#092433,#063042);border-radius:6px;padding:12px;color:var(--muted);
+      position:relative;display:grid;grid-template-columns:1fr 1fr;gap:8px;
+    }
+    .slot{
+      background:var(--slot);border-radius:6px;padding:8px;border:2px dashed rgba(255,255,255,0.02);
+      min-height:48px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:600;
+      transition:all .15s;
+    }
+    .slot.accepting{border-style:solid;border-color:rgba(255,255,255,0.06)}
+    .slot.correct{outline:3px solid rgba(16,185,129,0.12);border-color:rgba(16,185,129,0.25);color:var(--good)}
+    .slot.incorrect{outline:3px solid rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.25);color:var(--bad)}
+    .slot.small{min-height:38px;font-size:13px}
+    .ghost{opacity:.28}
+
+    /* right panel */
+    #controls{display:flex;flex-direction:column;gap:10px}
+    button{background:#0b2440;border:none;padding:10px;border-radius:8px;color:#dff6ea;font-weight:600;cursor:pointer}
+    button.secondary{background:#0f2a3d;color:var(--muted);font-weight:600}
+    .hint{background:#081021;padding:10px;border-radius:8px;color:var(--muted);font-size:13px}
+    .result{padding:10px;border-radius:8px;font-weight:700}
+    .result.ok{background:linear-gradient(90deg,#073b22,#083727);color:var(--good)}
+    .result.bad{background:linear-gradient(90deg,#3a0b12,#2a0710);color:var(--bad)}
+
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+    .small{font-size:13px;color:var(--muted)}
+    .slot .placed{display:flex;gap:8px;align-items:center}
+    .placed .comp-emoji{font-size:18px}
+    .controls-row{display:flex;gap:8px}
+    .score{font-weight:700}
+    @media(max-width:980px){
+      .wrap{grid-template-columns:1fr;gap:12px}
+      #case-area{order:2}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Simulasi Merakit PC</h1>
+      <p class="lead">Susun komponen komputer dari inventory ke slot yang sesuai — drag & drop atau klik untuk menempatkan.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel" aria-label="Inventory">
+      <h2 style="margin-top:0;font-size:14px">Inventory</h2>
+      <p class="small">Tarik (drag) komponen atau klik komponen lalu klik slot tujuan.</p>
+
+      <div id="inventory">
+        <div class="inventory-grid" id="inventory-grid">
+          <!-- Components inserted by JS -->
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button id="shuffle">Shuffle Inventory</button>
+          <button id="reset" class="secondary">Reset Build</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="case-area" class="panel" aria-label="PC Case area">
+      <div class="pc-case" role="application" aria-label="PC case">
+        <div class="chamber" aria-hidden="false">
+          <div class="mobo" id="mobo" aria-label="Motherboard">
+            <div class="slot" data-slot="cpu" id="slot-cpu">CPU Socket</div>
+            <div class="slot small" data-slot="psu" id="slot-psu">PSU Bay</div>
+            <div class="slot small" data-slot="ram1" id="slot-ram1">RAM Slot 1</div>
+            <div class="slot small" data-slot="ram2" id="slot-ram2">RAM Slot 2</div>
+            <div class="slot small" data-slot="gpu" id="slot-gpu">PCIe x16 (GPU)</div>
+            <div class="slot small" data-slot="storage" id="slot-storage">M.2 / Storage</div>
+            <div class="slot small" data-slot="case" id="slot-case">Case (chassis)</div>
+            <div class="slot small" data-slot="motherboard" id="slot-motherboard">Motherboard (place in Case)</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="panel hint">
+            <strong>Tujuan:</strong>
+            <ul style="margin:6px 0 0 18px;padding:0;color:var(--muted)">
+              <li>Tempatkan Case dulu lalu Motherboard ke Case.</li>
+              <li>Pasang CPU ke CPU Socket, RAM ke RAM Slot, GPU ke PCIe, Storage ke storage, PSU ke PSU bay.</li>
+            </ul>
+          </div>
+
+          <div id="controls">
+            <div class="controls-row">
+              <button id="check">Check Build</button>
+              <button id="undo" class="secondary">Undo Last</button>
+            </div>
+            <div id="resultBox" aria-live="polite"></div>
+            <div class="hint small">Tips: Bila drag tidak nyaman pada perangkat sentuh, gunakan klik komponen lalu klik slot.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel" aria-label="Info & scoring">
+      <h3 style="margin-top:0">Status Build</h3>
+      <div id="statusList" class="small" style="display:flex;flex-direction:column;gap:8px">
+        <!-- status lines -->
+      </div>
+
+      <h3 style="margin-top:12px">Komponen Wajib</h3>
+      <ul class="small" id="requiredList" style="margin-top:8px;color:var(--muted)">
+        <!-- filled by JS -->
+      </ul>
+
+      <div style="margin-top:12px">
+        <button id="explain" class="secondary">Explain Compatibility (simple)</button>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <div class="small">Dibuat untuk demonstrasi. Ingin fitur lain (harga, kompatibilitas socket/DDR, levels)? Minta saja.</div>
+  </footer>
+
+  <script>
+    // Data model for components
+    const COMPONENTS = [
+      { id: 'case', name: 'Case (Chassis)', type: 'case', emoji: '🧰', desc: 'Rangka tempat semua komponen' },
+      { id: 'motherboard', name: 'Motherboard', type: 'motherboard', emoji: '🧩', desc: 'Papan utama, pasang ke Case' },
+      { id: 'cpu', name: 'CPU', type: 'cpu', emoji: '🧠', desc: 'Prosesor — pasang ke CPU socket' },
+      { id: 'ram', name: 'RAM (8GB)', type: 'ram', emoji: '📦', desc: 'Memori — pasang ke RAM slot' },
+      { id: 'gpu', name: 'GPU', type: 'gpu', emoji: '🎮', desc: 'Kartu grafis — pasang ke PCIe' },
+      { id: 'storage', name: 'NVMe SSD', type: 'storage', emoji: '💾', desc: 'Penyimpanan — M.2 / SATA' },
+      { id: 'psu', name: 'PSU (Power)', type: 'psu', emoji: '🔌', desc: 'Catu daya — pasang ke PSU bay' }
+    ];
+
+    // Which component types are allowed in which slots
+    const SLOT_RULES = {
+      'slot-case': ['case'],
+      'slot-motherboard': ['motherboard'],
+      'slot-cpu': ['cpu'],
+      'slot-ram1': ['ram'],
+      'slot-ram2': ['ram'],
+      'slot-gpu': ['gpu'],
+      'slot-storage': ['storage'],
+      'slot-psu': ['psu']
+    };
+
+    // Required slots to consider build valid
+    const REQUIRED_SLOTS = ['slot-case','slot-motherboard','slot-cpu','slot-ram1','slot-ram2','slot-psu'];
+
+    // State
+    const placed = {}; // slotId -> componentId
+    const history = []; // {slot, comp}
+    let selectedComp = null; // for click-to-place
+
+    // DOM helpers
+    const inventoryGrid = document.getElementById('inventory-grid');
+    const resultBox = document.getElementById('resultBox');
+    const statusList = document.getElementById('statusList');
+    const requiredList = document.getElementById('requiredList');
+
+    // Build inventory UI
+    function renderInventory(){
+      inventoryGrid.innerHTML = '';
+      COMPONENTS.forEach(c=>{
+        const el = document.createElement('div');
+        el.className = 'component';
+        el.draggable = true;
+        el.id = 'comp-'+c.id;
+        el.dataset.compId = c.id;
+        el.dataset.compType = c.type;
+        el.innerHTML = `<div class="comp-emoji">${c.emoji}</div>
+                        <div style="flex:1">
+                          <div class="comp-title">${c.name}</div>
+                          <div class="comp-desc">${c.desc}</div>
+                        </div>`;
+        // drag events
+        el.addEventListener('dragstart', onDragStart);
+        el.addEventListener('click', onComponentClick);
+        inventoryGrid.appendChild(el);
+      });
+    }
+
+    // Place initial required list display
+    function renderRequired(){
+      requiredList.innerHTML = '';
+      const names = {
+        'slot-case':'Case','slot-motherboard':'Motherboard','slot-cpu':'CPU',
+        'slot-ram1':'RAM slot 1','slot-ram2':'RAM slot 2','slot-gpu':'GPU slot','slot-storage':'Storage','slot-psu':'PSU'
+      };
+      REQUIRED_SLOTS.forEach(s=>{
+        const li = document.createElement('li');
+        li.textContent = names[s] || s;
+        requiredList.appendChild(li);
+      });
+    }
+
+    // Setup slots
+    function initSlots(){
+      Object.keys(SLOT_RULES).forEach(slotId=>{
+        const slotEl = document.getElementById(slotId);
+        if(!slotEl) return;
+        slotEl.addEventListener('dragover', ev=>{ ev.preventDefault(); slotEl.classList.add('accepting') });
+        slotEl.addEventListener('dragleave', ev=>{ slotEl.classList.remove('accepting') });
+        slotEl.addEventListener('drop', ev=>{
+          ev.preventDefault(); slotEl.classList.remove('accepting');
+          const compId = ev.dataTransfer.getData('text/plain');
+          if(compId) placeComponent(slotId, compId);
+        });
+        slotEl.addEventListener('click', ()=>onSlotClick(slotId));
+      });
+    }
+
+    // Drag start set data
+    function onDragStart(e){
+      const compId = e.currentTarget.dataset.compId;
+      e.dataTransfer.setData('text/plain', compId);
+      // for feedback
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function onComponentClick(e){
+      const id = e.currentTarget.dataset.compId;
+      // toggle select
+      if(selectedComp === id){
+        selectedComp = null;
+        e.currentTarget.classList.remove('ghost');
+      } else {
+        selectedComp = id;
+        // ghost other comps
+        document.querySelectorAll('.component').forEach(node=>{
+          node.classList.toggle('ghost', node.dataset.compId !== id);
+        });
+      }
+    }
+
+    function onSlotClick(slotId){
+      if(!selectedComp) return;
+      placeComponent(slotId, selectedComp);
+      // clear selection visuals
+      selectedComp = null;
+      document.querySelectorAll('.component').forEach(node=>node.classList.remove('ghost'));
+    }
+
+    // Place component into slot (logic + UI)
+    function placeComponent(slotId, compId){
+      const slotEl = document.getElementById(slotId);
+      if(!slotEl) return;
+      // check allowed types
+      const comp = COMPONENTS.find(c=>c.id===compId);
+      const allowed = SLOT_RULES[slotId] || [];
+      // Special rule: motherboard must be placed into case first OR we allow motherboard directly but require case eventually
+      if(slotId === 'slot-motherboard' && !placed['slot-case']){
+        showResult('Letakkan Case dulu sebelum Motherboard.', false);
+        flashSlot('slot-case', 'accepting');
+        return;
+      }
+      // If slot already has something, move it back to inventory (simple behavior)
+      if(placed[slotId]){
+        // push previous back
+        const prev = placed[slotId];
+        unplace(slotId);
+      }
+
+      // check compatibility
+      if(!allowed.includes(comp.type)){
+        // allow placing but mark incorrect
+        placed[slotId] = compId;
+        history.push({slot:slotId, comp:compId});
+        renderSlotFilled(slotId, comp, false);
+        showResult(`Salah: ${comp.name} tidak cocok di slot ${slotEl.textContent.trim()}`, false);
+      } else {
+        placed[slotId] = compId;
+        history.push({slot:slotId, comp:compId});
+        renderSlotFilled(slotId, comp, true);
+        showResult(`${comp.name} dipasang di ${slotEl.textContent.trim()}`, true);
+      }
+      renderStatus();
+    }
+
+    function unplace(slotId){
+      const compId = placed[slotId];
+      if(!compId) return;
+      delete placed[slotId];
+      const slotEl = document.getElementById(slotId);
+      if(slotEl) {
+        slotEl.innerHTML = slotEl.dataset.label || slotEl.textContent;
+        slotEl.classList.remove('correct','incorrect');
+        // restore default content
+        slotEl.textContent = slotEl.getAttribute('data-slot') ? slotEl.textContent : slotEl.textContent;
+      }
+      // remove from history (last occurrence)
+      for(let i=history.length-1;i>=0;i--){
+        if(history[i].slot===slotId && history[i].comp===compId){
+          history.splice(i,1);
+          break;
+        }
+      }
+      renderStatus();
+    }
+
+    function renderSlotFilled(slotId, comp, ok){
+      const slotEl = document.getElementById(slotId);
+      if(!slotEl) return;
+      slotEl.innerHTML = `<div class="placed"><div class="comp-emoji">${comp.emoji}</div><div>${comp.name}</div></div>`;
+      slotEl.classList.toggle('correct', ok);
+      slotEl.classList.toggle('incorrect', !ok);
+    }
+
+    function showResult(msg, ok){
+      resultBox.innerHTML = `<div class="result ${ok ? 'ok' : 'bad'}">${msg}</div>`;
+      setTimeout(()=>{ resultBox.innerHTML = ''; }, 2500);
+    }
+
+    function renderStatus(){
+      statusList.innerHTML = '';
+      Object.keys(SLOT_RULES).forEach(slotId=>{
+        const line = document.createElement('div');
+        const slotName = document.getElementById(slotId)?.textContent || slotId;
+        if(placed[slotId]){
+          const comp = COMPONENTS.find(c=>c.id===placed[slotId]);
+          const ok = SLOT_RULES[slotId].includes(comp.type);
+          line.innerHTML = `${slotName}: <span style="color:${ok ? 'var(--good)' : 'var(--bad)'}">${comp.name}</span>`;
+        } else {
+          line.innerHTML = `${slotName}: <span style="color:var(--muted)">-- kosong --</span>`;
+        }
+        statusList.appendChild(line);
+      });
+    }
+
+    // Check build validity
+    document.getElementById('check').addEventListener('click', ()=>{
+      const missing = [];
+      const bad = [];
+      REQUIRED_SLOTS.forEach(slot=>{
+        if(!placed[slot]) missing.push(slot);
+        else {
+          const comp = COMPONENTS.find(c=>c.id===placed[slot]);
+          if(!SLOT_RULES[slot].includes(comp.type)) bad.push(slot);
+        }
+      });
+      if(missing.length===0 && bad.length===0){
+        showResult('Build valid! Komponen wajib terpasang dengan benar. ✅', true);
+        // Mark all as correct
+        Object.keys(placed).forEach(s=>{
+          const slotEl = document.getElementById(s);
+          if(slotEl) slotEl.classList.add('correct');
+        });
+      } else {
+        let msg = '';
+        if(missing.length) msg += `Komponen hilang: ${missing.map(s=>document.getElementById(s).textContent).join(', ')}. `;
+        if(bad.length) msg += `Kesalahan pemasangan di: ${bad.map(s=>document.getElementById(s).textContent).join(', ')}.`;
+        showResult(msg.trim(), false);
+        // Mark bad ones
+        bad.forEach(s=>{
+          document.getElementById(s)?.classList.add('incorrect');
+        });
+      }
+      renderStatus();
+    });
+
+    // Undo last action
+    document.getElementById('undo').addEventListener('click', ()=>{
+      const last = history.pop();
+      if(!last){ showResult('Tidak ada aksi untuk di-undo.', false); return; }
+      if(placed[last.slot] && placed[last.slot]===last.comp){
+        unplace(last.slot);
+        showResult('Undo: aksi terakhir dibatalkan.', true);
+      }
+    });
+
+    // Reset build
+    document.getElementById('reset').addEventListener('click', resetAll);
+    function resetAll(){
+      Object.keys(SLOT_RULES).forEach(s=>{
+        const el = document.getElementById(s);
+        if(el){
+          el.innerHTML = el.getAttribute('data-slot') || el.textContent;
+          el.classList.remove('correct','incorrect','accepting');
+        }
+      });
+      for(const k in placed) delete placed[k];
+      history.length = 0;
+      selectedComp = null;
+      document.querySelectorAll('.component').forEach(node=>node.classList.remove('ghost'));
+      showResult('Build direset.', true);
+      renderStatus();
+    }
+
+    // Shuffle inventory (visual only)
+    document.getElementById('shuffle').addEventListener('click', ()=>{
+      COMPONENTS.sort(()=>Math.random() - 0.5);
+      renderInventory();
+      showResult('Inventory diacak.', true);
+    });
+
+    // Explain simple compatibility (stub)
+    document.getElementById('explain').addEventListener('click', ()=>{
+      const msg = `Penjelasan singkat: CPU memasang ke socket di motherboard. RAM memasang ke slot RAM (gunakan tipe yang cocok, contoh DDR4/DDR5). GPU ke slot PCIe x16. Storage NVMe ke M.2 atau SATA ke konektor penyimpanan. PSU harus menyediakan daya ke semua komponen.`;
+      resultBox.innerHTML = `<div class="hint">${msg}</div>`;
+      setTimeout(()=>resultBox.innerHTML='',6000);
+    });
+
+    // small helper to blink a slot
+    function flashSlot(slotId, cls){
+      const el = document.getElementById(slotId);
+      if(!el) return;
+      el.classList.add(cls);
+      setTimeout(()=>el.classList.remove(cls),1200);
+    }
+
+    // init run
+    renderInventory();
+    renderRequired();
+    initSlots();
+    renderStatus();
+
+    // Accessibility: keyboard support - select comp with keyboard (optional)
+    // (not fully comprehensive; demonstration)
+    document.addEventListener('keydown', e=>{
+      if(e.key === 'Escape'){
+        selectedComp = null;
+        document.querySelectorAll('.component').forEach(node=>node.classList.remove('ghost'));
+      }
+    });
+
+    // Pre-place case to make flow easier (optional) - commented out
+    // placeComponent('slot-case','case');
+
+  </script>
+</body>
+</html>
